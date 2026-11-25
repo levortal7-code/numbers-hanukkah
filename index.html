@@ -1,0 +1,2246 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ספרות בחנוכה</title>
+  <style>
+    /* איפוס בסיסי ומניעת גלילה או זום במגע */
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background-color: #dfeaf4; /* רקע כחול בהיר ורך בניגודיות נמוכה */
+      color: #2f455c;
+      font-family: 'Arial Rounded MT Bold', 'Arial Black', 'Varela Round', 'Assistant', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      touch-action: manipulation;
+      overscroll-behavior: none;
+    }
+
+    /* פריסת מסך מלאה */
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* מסכים */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4vmin;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.6s ease-in-out;
+    }
+
+    .screen.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* כותרות וכפתורים ראשיים */
+    .main-title {
+      font-size: clamp(2.5rem, 8.5vmin, 5.2rem);
+      font-weight: 800;
+      color: #2b4560;
+      margin: 0 0 5vmin 0;
+      text-align: center;
+      letter-spacing: -0.02em;
+    }
+
+    /* רשת 4 כפתורי בחירת רמה במסך הפתיחה */
+    .level-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: clamp(16px, 3.8vmin, 34px);
+      width: min(88vw, 760px);
+    }
+
+    @media (max-width: 480px) {
+      .level-grid {
+        grid-template-columns: 1fr;
+        width: min(84vw, 360px);
+        gap: 14px;
+      }
+    }
+
+    .level-choice-btn {
+      border-radius: 32px;
+      padding: clamp(18px, 3.4vmin, 30px) clamp(20px, 4vmin, 36px);
+      font-size: clamp(1.65rem, 4.8vmin, 2.7rem);
+      font-weight: 800;
+      font-family: inherit;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(43, 69, 96, 0.12);
+      transition: transform 0.18s ease, filter 0.18s ease;
+      text-align: center;
+    }
+
+    .level-choice-btn:active {
+      transform: scale(0.97);
+      filter: brightness(0.96);
+    }
+
+    /* צבעים שונים ורכים לכל כפתור רמה */
+    .lvl-btn-1 {
+      background-color: #cde3f5;
+      border: 4px solid #8bb4d6;
+      color: #26435e;
+    }
+
+    .lvl-btn-2 {
+      background-color: #d2ebd9;
+      border: 4px solid #8ec29e;
+      color: #254a32;
+    }
+
+    .lvl-btn-3 {
+      background-color: #f5e6c4;
+      border: 4px solid #d6b878;
+      color: #54411b;
+    }
+
+    .lvl-btn-4 {
+      background-color: #e4dcf5;
+      border: 4px solid #b09fd6;
+      color: #3a2b59;
+    }
+
+    /* אזור המשחק והספרה (גובה כ-70% מהצלע הקצרה של המסך + שולי לחיצה נוחים) */
+    #digit-stage {
+      position: relative;
+      width: min(88vw, 88dvh);
+      height: min(88vw, 88dvh);
+      max-width: 96vw;
+      max-height: 92dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 1;
+      transition: opacity 0.55s ease-in-out;
+      z-index: 2;
+    }
+
+    #digit-stage.fading {
+      opacity: 0;
+    }
+
+    #main-svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    /* קנבס כוכבי זהב לחיזוק חיובי בסיום כל ספרה */
+    #digit-stars-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    /* אנימציית תזכורת רכה לאחר 10 שניות ללא מגע */
+    @keyframes gentleSway {
+      0%, 100% { transform: rotate(0deg) scale(1); }
+      25% { transform: rotate(-2.2deg) scale(1.015); }
+      75% { transform: rotate(2.2deg) scale(1.015); }
+    }
+
+    .sway-hint {
+      transform-origin: center center;
+      animation: gentleSway 1.6s ease-in-out;
+    }
+
+    /* זוהר זהוב רך ואיטי בסיום מילוי הספרה (fade-in ואחרי כשנייה fade-out) */
+    #digit-glow-group {
+      transition: filter 0.85s ease-in-out;
+    }
+
+    #digit-glow-group.completed-glow {
+      filter: drop-shadow(0 0 24px rgba(242, 198, 92, 0.92));
+    }
+
+    /* קפיצה קלה ורכה של האלמנטים בגל איטי בסיום הספרה */
+    @keyframes gentleItemWave {
+      0%   { transform: translateY(0) scale(1); }
+      45%  { transform: translateY(-6px) scale(1.12); }
+      100% { transform: translateY(0) scale(1); }
+    }
+
+    .item-wave-bounce {
+      animation: gentleItemWave 0.75s ease-in-out;
+    }
+
+    /* כפתור הבא ידני (כאשר מעבר אוטומטי כבוי) */
+    #manual-next-btn {
+      position: absolute;
+      bottom: 3.5dvh;
+      background-color: #6c91b2;
+      color: #ffffff;
+      border: 3px solid #527696;
+      border-radius: 28px;
+      padding: 12px 34px;
+      font-size: clamp(1.3rem, 3.8vmin, 2rem);
+      font-weight: 700;
+      font-family: inherit;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+      box-shadow: 0 4px 12px rgba(43, 69, 96, 0.15);
+      z-index: 5;
+    }
+
+    #manual-next-btn.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* אייקון הגדרות מבוגר (שקט, פינתי, מרווח בטיחות) */
+    #settings-btn {
+      position: fixed;
+      top: max(14px, env(safe-area-inset-top, 14px));
+      left: max(14px, env(safe-area-inset-left, 14px));
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background-color: rgba(255, 255, 255, 0.35);
+      border: 1px solid rgba(47, 69, 92, 0.12);
+      color: rgba(47, 69, 92, 0.48);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 50;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    #settings-btn:active {
+      background-color: rgba(255, 255, 255, 0.65);
+      color: rgba(47, 69, 92, 0.85);
+    }
+
+    /* שכבת רקע שקופה לסגירת חלונית בלחיצה בחוץ */
+    #settings-backdrop {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(30, 48, 66, 0.18);
+      z-index: 90;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    #settings-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* חלונית הגדרות קומפקטית ללא גלילה */
+    #settings-panel {
+      position: fixed;
+      top: max(16px, env(safe-area-inset-top, 16px));
+      left: max(16px, env(safe-area-inset-left, 16px));
+      width: min(330px, 90vw);
+      background-color: #f6f9fc;
+      border: 1px solid #cbd9e6;
+      border-radius: 22px;
+      box-shadow: 0 12px 32px rgba(31, 50, 70, 0.18);
+      padding: 12px 16px 14px 16px;
+      z-index: 100;
+      opacity: 0;
+      transform: scale(0.96);
+      transform-origin: top left;
+      pointer-events: none;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    #settings-panel.open {
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: auto;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #e1ebf2;
+      padding-bottom: 4px;
+      margin-bottom: 2px;
+    }
+
+    .panel-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #2f455c;
+    }
+
+    /* כפתור סגירה עם אזור לחיצה של לפחות 48px */
+    #close-settings-btn {
+      width: 48px;
+      height: 48px;
+      margin: -8px -8px -8px 0;
+      border: none;
+      background: transparent;
+      color: #4f6b87;
+      font-size: 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border-radius: 14px;
+    }
+
+    #close-settings-btn:active {
+      background-color: #e4edf5;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.92rem;
+      color: #344d66;
+    }
+
+    .setting-label {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .segmented-group {
+      display: flex;
+      background-color: #e3ecf4;
+      border-radius: 12px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .seg-btn {
+      border: none;
+      background: transparent;
+      color: #44607c;
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 6px 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .seg-btn.active {
+      background-color: #ffffff;
+      color: #233b54;
+      box-shadow: 0 1px 4px rgba(35, 59, 84, 0.12);
+    }
+
+    /* בקרת עוצמת קול והשתקה */
+    .volume-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      justify-content: flex-end;
+    }
+
+    #volume-slider {
+      width: 105px;
+      accent-color: #5b82a6;
+      cursor: pointer;
+    }
+
+    #mute-btn {
+      border: 1px solid #cbd9e6;
+      background-color: #ffffff;
+      color: #344d66;
+      border-radius: 10px;
+      width: 36px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+
+    #mute-btn.muted {
+      background-color: #fceaea;
+      border-color: #e6b8b8;
+      color: #9e4747;
+    }
+
+    /* כפתור חזרה למסך פתיחה בלחיצה ארוכה 2 שניות */
+    #home-hold-wrapper {
+      margin-top: 4px;
+      display: none;
+    }
+
+    #home-hold-wrapper.visible {
+      display: block;
+    }
+
+    #home-hold-btn {
+      position: relative;
+      width: 100%;
+      height: 42px;
+      border-radius: 14px;
+      border: 1px solid #c3d4e3;
+      background-color: #e8f0f7;
+      color: #2f455c;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 700;
+      overflow: hidden;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #home-hold-fill {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 0%;
+      background-color: rgba(91, 130, 166, 0.28);
+      pointer-events: none;
+    }
+
+    #home-hold-text {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* קנבס חגיגת סיום שקטה */
+    #celebration-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .celebration-msg {
+      font-size: clamp(2.6rem, 8.5vmin, 5rem);
+      font-weight: 800;
+      color: #2b4560;
+      z-index: 2;
+      text-align: center;
+      transition: opacity 0.6s ease;
+    }
+
+    .celebration-msg.hidden-msg {
+      display: none;
+    }
+
+    /* מיכל שני הכפתורים במסך הסיום לאחר החגיגה */
+    #end-buttons-stack {
+      z-index: 2;
+      display: none;
+      flex-direction: column;
+      gap: clamp(22px, 5vmin, 42px);
+      width: min(86vw, 440px);
+    }
+
+    #end-buttons-stack.visible {
+      display: flex;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- כפתור הגדרות מבוגר -->
+    <button id="settings-btn" type="button" aria-label="הגדרות מבוגר">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
+
+    <!-- רקע לסגירת חלונית הגדרות -->
+    <div id="settings-backdrop"></div>
+
+    <!-- חלונית הגדרות מבוגר -->
+    <div id="settings-panel" role="dialog" aria-label="הגדרות">
+      <div class="panel-header">
+        <span class="panel-title">הגדרות מבוגר</span>
+        <button id="close-settings-btn" type="button" aria-label="סגור">✕</button>
+      </div>
+
+      <!-- טווח ספרות / רמה -->
+      <div class="setting-row">
+        <span class="setting-label">רמה:</span>
+        <div class="segmented-group" id="opt-level">
+          <button type="button" class="seg-btn" data-val="1-3">1-3</button>
+          <button type="button" class="seg-btn" data-val="3-5">3-5</button>
+          <button type="button" class="seg-btn" data-val="5-10">5-10</button>
+          <button type="button" class="seg-btn" data-val="1-10">1-10</button>
+        </div>
+      </div>
+
+      <!-- אופן מילוי -->
+      <div class="setting-row">
+        <span class="setting-label">אופן מילוי:</span>
+        <div class="segmented-group" id="opt-fill">
+          <button type="button" class="seg-btn" data-val="step">כל נגיעה +1</button>
+          <button type="button" class="seg-btn" data-val="auto">נגיעה אחת</button>
+        </div>
+      </div>
+
+      <!-- סדר ספרות -->
+      <div class="setting-row">
+        <span class="setting-label">סדר:</span>
+        <div class="segmented-group" id="opt-order">
+          <button type="button" class="seg-btn" data-val="asc">עולה</button>
+          <button type="button" class="seg-btn" data-val="rand">אקראי</button>
+        </div>
+      </div>
+
+      <!-- מעבר אוטומטי -->
+      <div class="setting-row">
+        <span class="setting-label">מעבר אוטומטי:</span>
+        <div class="segmented-group" id="opt-autonext">
+          <button type="button" class="seg-btn" data-val="on">פועל</button>
+          <button type="button" class="seg-btn" data-val="off">כבוי</button>
+        </div>
+      </div>
+
+      <!-- הקראת ספירה -->
+      <div class="setting-row">
+        <span class="setting-label">הקראת ספירה:</span>
+        <div class="segmented-group" id="opt-tts">
+          <button type="button" class="seg-btn" data-val="on">פועלת</button>
+          <button type="button" class="seg-btn" data-val="off">כבויה</button>
+        </div>
+      </div>
+
+      <!-- עוצמת קול והשתקה -->
+      <div class="setting-row">
+        <span class="setting-label">עוצמת קול:</span>
+        <div class="volume-controls">
+          <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.7" aria-label="עוצמת קול">
+          <button type="button" id="mute-btn" aria-label="השתק">🔊</button>
+        </div>
+      </div>
+
+      <!-- כפתור חזרה למסך פתיחה בלחיצה ארוכה של 2 שניות (במסכי המשחק בלבד) -->
+      <div id="home-hold-wrapper">
+        <button type="button" id="home-hold-btn">
+          <div id="home-hold-fill"></div>
+          <span id="home-hold-text">מסך פתיחה (החזק 2 שניות)</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- מסך פתיחה עם 4 כפתורי בחירת רמה -->
+    <section id="start-screen" class="screen active">
+      <h1 class="main-title">ספרות בחנוכה</h1>
+      <div class="level-grid">
+        <button type="button" class="level-choice-btn lvl-btn-1" data-level="1-3">ספרות 1-3</button>
+        <button type="button" class="level-choice-btn lvl-btn-2" data-level="3-5">ספרות 3-5</button>
+        <button type="button" class="level-choice-btn lvl-btn-3" data-level="5-10">ספרות 5-10</button>
+        <button type="button" class="level-choice-btn lvl-btn-4" data-level="1-10">ספרות 1-10</button>
+      </div>
+    </section>
+
+    <!-- מסך משחק -->
+    <section id="game-screen" class="screen">
+      <canvas id="digit-stars-canvas"></canvas>
+
+      <div id="digit-stage" role="button" tabindex="0" aria-label="מלא ספרה">
+        <!-- viewBox מותאם כך שהספרה תתפוס עד 88% מגובה/רוחב המסך -->
+        <svg id="main-svg" viewBox="22 22 156 156" preserveAspectRatio="xMidYMid meet">
+          <!-- אזור לחיצה רחב (כל הספרה ושולי המרווח סביבה) -->
+          <rect id="hit-area" x="0" y="0" width="200" height="200" rx="24" fill="transparent" />
+
+          <!-- קבוצת הספרה הראשית (ממוקמת במרכז 50,30 לגודל 100x140) -->
+          <g id="digit-glow-group" transform="translate(50, 30)">
+            <!-- שכבת מסלולי קו המתאר העבה -->
+            <g id="digit-outline-layer"></g>
+
+            <!-- שכבת מסלולי הפנים הבהיר -->
+            <g id="digit-inner-layer"></g>
+
+            <!-- שכבת האלמנטים החנוכתיים לאורך קו האמצע -->
+            <g id="items-layer"></g>
+          </g>
+        </svg>
+      </div>
+
+      <!-- כפתור המשך ידני (מופיע רק אם מעבר אוטומטי כבוי והספרה הושלמה) -->
+      <button id="manual-next-btn" type="button">הספרה הבאה</button>
+    </section>
+
+    <!-- מסך סיום וחגיגה -->
+    <section id="end-screen" class="screen">
+      <canvas id="celebration-canvas"></canvas>
+      <div id="celebration-msg" class="celebration-msg">כל הכבוד!</div>
+      <div id="end-buttons-stack">
+        <button id="play-again-btn" class="level-choice-btn lvl-btn-1" type="button">שחק שוב</button>
+        <button id="end-home-btn" class="level-choice-btn lvl-btn-2" type="button">מסך ראשי</button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* =====================================================================
+         1. הגדרות ברירת מחדל ושמירה בטוחה ב-localStorage
+         ===================================================================== */
+      const STORAGE_KEY = 'hanukkah_digits_settings_v2';
+      const defaultSettings = {
+        level: '1-3',       // '1-3' | '3-5' | '5-10' | '1-10'
+        fillMode: 'step',   // 'step' (כל נגיעה מוסיפה אלמנט - ברירת מחדל) | 'auto'
+        order: 'asc',       // 'asc' | 'rand'
+        autoNext: 'on',     // 'on' | 'off'
+        tts: 'on',          // 'on' | 'off'
+        volume: 0.7,        // 0..1
+        muted: false        // boolean
+      };
+
+      let settings = Object.assign({}, defaultSettings);
+
+      function loadSettings() {
+        try {
+          const raw = window.localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+              settings = Object.assign({}, defaultSettings, parsed);
+            }
+          }
+        } catch (e) {
+          // התעלמות שקטה אם localStorage חסום או לא זמין
+        }
+      }
+
+      function saveSettings() {
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+        } catch (e) {
+          // התעלמות שקטה אם השמירה נכשלה
+        }
+      }
+
+      loadSettings();
+
+      /* =====================================================================
+         2. מניעת זום וגלילה במכשירי מגע בלבד (מחשב שומר על התנהגות רגילה)
+         ===================================================================== */
+      const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      if (isTouchDevice) {
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(evtName => {
+          document.addEventListener(evtName, function (e) {
+            e.preventDefault();
+          }, { passive: false });
+        });
+      }
+
+      /* =====================================================================
+         3. מנוע שמע (Web Audio API) + תור הקראה בעברית (SpeechSynthesis Queue)
+         ===================================================================== */
+      let audioCtx = null;
+      let activeVoices = [];
+
+      function initAudio() {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+          }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+      }
+
+      function stopAllSounds() {
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime;
+        activeVoices.forEach(v => {
+          try {
+            v.gain.cancelScheduledValues(now);
+            v.gain.setValueAtTime(v.gain.value, now);
+            v.gain.linearRampToValueAtTime(0.0001, now + 0.04);
+            v.osc.stop(now + 0.05);
+          } catch (e) {}
+        });
+        activeVoices = [];
+      }
+
+      // סולם פנטטוני רך (C4, D4, E4, G4, A4, C5, D5, E5, G5, A5, C6)
+      const PENTATONIC_FREQS = [
+        261.63, 293.66, 329.63, 392.00, 440.00,
+        523.25, 587.33, 659.25, 783.99, 880.00, 1046.50
+      ];
+
+      function playInstrumentNote(instrumentType, noteIndex, isClosing = false) {
+        if (settings.muted || settings.volume <= 0.01) return;
+        initAudio();
+        if (!audioCtx) return;
+
+        stopAllSounds();
+
+        const now = audioCtx.currentTime;
+        const freq = PENTATONIC_FREQS[Math.min(noteIndex, PENTATONIC_FREQS.length - 1)];
+        const masterVol = settings.volume * 0.24;
+
+        const osc = audioCtx.createOscillator();
+        const overtone = audioCtx.createOscillator();
+        const filter = audioCtx.createBiquadFilter();
+        const gain = audioCtx.createGain();
+        const overtoneGain = audioCtx.createGain();
+
+        filter.type = 'lowpass';
+
+        let attack = 0.035;
+        let decay = isClosing ? 1.1 : 0.65;
+
+        switch (instrumentType) {
+          case 'coin': // גלוקנשפיל
+            osc.type = 'sine';
+            overtone.type = 'sine';
+            osc.frequency.setValueAtTime(freq * 2, now);
+            overtone.frequency.setValueAtTime(freq * 4, now);
+            overtoneGain.gain.setValueAtTime(0.18, now);
+            filter.frequency.setValueAtTime(2800, now);
+            attack = 0.025;
+            decay = isClosing ? 1.2 : 0.7;
+            break;
+
+          case 'candle': // צ'לסטה
+            osc.type = 'triangle';
+            overtone.type = 'sine';
+            osc.frequency.setValueAtTime(freq * 1.5, now);
+            overtone.frequency.setValueAtTime(freq * 3, now);
+            overtoneGain.gain.setValueAtTime(0.14, now);
+            filter.frequency.setValueAtTime(1600, now);
+            attack = 0.03;
+            decay = isClosing ? 1.15 : 0.68;
+            break;
+
+          case 'dreidel': // מוזיקת-בוקס
+            osc.type = 'sine';
+            overtone.type = 'triangle';
+            osc.frequency.setValueAtTime(freq * 2, now);
+            overtone.frequency.setValueAtTime(freq * 3, now);
+            overtoneGain.gain.setValueAtTime(0.1, now);
+            filter.frequency.setValueAtTime(2200, now);
+            attack = 0.02;
+            decay = isClosing ? 1.1 : 0.6;
+            break;
+
+          case 'latke': // מרימבה
+            osc.type = 'sine';
+            overtone.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+            overtone.frequency.setValueAtTime(freq * 4, now);
+            overtoneGain.gain.setValueAtTime(0.08, now);
+            filter.frequency.setValueAtTime(950, now);
+            attack = 0.025;
+            decay = isClosing ? 0.95 : 0.52;
+            break;
+
+          case 'sufganiya': // נבל
+          default:
+            osc.type = 'triangle';
+            overtone.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+            overtone.frequency.setValueAtTime(freq * 2, now);
+            overtoneGain.gain.setValueAtTime(0.22, now);
+            filter.frequency.setValueAtTime(1400, now);
+            filter.frequency.exponentialRampToValueAtTime(500, now + decay);
+            attack = 0.04;
+            decay = isClosing ? 1.3 : 0.78;
+            break;
+        }
+
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(masterVol, now + attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + attack + decay);
+
+        osc.connect(filter);
+        overtone.connect(overtoneGain);
+        overtoneGain.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(now);
+        overtone.start(now);
+        osc.stop(now + attack + decay + 0.05);
+        overtone.stop(now + attack + decay + 0.05);
+
+        activeVoices.push({ osc, gain });
+      }
+
+      // מנגינה קצרה ורכה של שלושה תווים עולים (נבל) לחיזוק בסיום כל ספרה
+      function playThreeNoteFlourish() {
+        if (settings.muted || settings.volume <= 0.01) return;
+        const notes = [2, 4, 5]; // E4 -> A4 -> C5
+        notes.forEach((nIdx, i) => {
+          const t = setTimeout(() => {
+            if (currentScreen === 'game' && !isPaused) {
+              playInstrumentNote('sufganiya', nIdx, i === notes.length - 1);
+            }
+          }, i * 380);
+          activeTimers.push(t);
+        });
+      }
+
+      // מנגינת סיום רכה בסוף השלב
+      function playCelebrationMelody() {
+        if (settings.muted || settings.volume <= 0.01) return;
+        const notes = [0, 2, 4, 5, 7, 5, 4, 5];
+        notes.forEach((nIdx, i) => {
+          const t = setTimeout(() => {
+            if (currentScreen === 'end' && !isPaused) {
+              playInstrumentNote('sufganiya', nIdx, i === notes.length - 1);
+            }
+          }, i * 520);
+          activeTimers.push(t);
+        });
+      }
+
+      // הקראה בעברית (ספירה מופשטת בנקבה בזמן הופעת האלמנטים)
+      const HEBREW_COUNT_FEM = {
+        1: 'אַחַת',
+        2: 'שְׁתַּיִם',
+        3: 'שָׁלוֹשׁ',
+        4: 'אַרְבַּע',
+        5: 'חָמֵשׁ',
+        6: 'שֵׁשׁ',
+        7: 'שֶׁבַע',
+        8: 'שְׁמוֹנֶה',
+        9: 'תֵּשַׁע',
+        10: 'עֶשֶׂר'
+      };
+
+      // טבלאות דקדוקיות מדויקות להקראת הסיכום בסיום כל ספרה
+      const HEBREW_MASC_NUMS = {
+        1: 'אֶחָד',
+        2: 'שְׁנֵי',
+        3: 'שְׁלוֹשָׁה',
+        4: 'אַרְבָּעָה',
+        5: 'חֲמִשָּׁה',
+        6: 'שִׁשָּׁה',
+        7: 'שִׁבְעָה',
+        8: 'שְׁמוֹנָה',
+        9: 'תִּשְׁעָה',
+        10: 'עֲשָׂרָה'
+      };
+
+      const HEBREW_FEM_NUMS = {
+        1: 'אַחַת',
+        2: 'שְׁתֵּי',
+        3: 'שָׁלוֹשׁ',
+        4: 'אַרְבַּע',
+        5: 'חָמֵשׁ',
+        6: 'שֵׁשׁ',
+        7: 'שֶׁבַע',
+        8: 'שְׁמוֹנֶה',
+        9: 'תֵּשַׁע',
+        10: 'עֶשֶׂר'
+      };
+
+      const ITEM_GRAMMAR = {
+        coin: { gender: 'm', singular: 'מַטְבֵּעַ', plural: 'מַטְבְּעוֹת' },
+        candle: { gender: 'm', singular: 'נֵר', plural: 'נֵרוֹת' },
+        dreidel: { gender: 'm', singular: 'סְבִיבוֹן', plural: 'סְבִיבוֹנִים' },
+        latke: { gender: 'f', singular: 'לְבִיבָה', plural: 'לְבִיבוֹת' },
+        sufganiya: { gender: 'f', singular: 'סוּפְגָּנִיָּה', plural: 'סוּפְגָּנִיּוֹת' }
+      };
+
+      function buildItemSummaryPhrase(count, itemType) {
+        const info = ITEM_GRAMMAR[itemType] || ITEM_GRAMMAR.coin;
+        if (count === 1) {
+          // N=1: שם עצם ביחיד + "אֶחָד" (זכר) או "אַחַת" (נקבה)
+          const numWord = info.gender === 'm' ? HEBREW_MASC_NUMS[1] : HEBREW_FEM_NUMS[1];
+          return `${info.singular} ${numWord}`;
+        }
+        // N=2..10: מספר (לרבות "שְׁנֵי"/"שְׁתֵּי") + שם עצם ברבים לפי המין
+        const numWord = info.gender === 'm' ? HEBREW_MASC_NUMS[count] : HEBREW_FEM_NUMS[count];
+        return `${numWord} ${info.plural}`;
+      }
+
+      let hebrewVoice = null;
+      let speechQueue = [];
+      let isProcessingSpeech = false;
+      let currentSpeechTimer = null;
+      let speechSequenceToken = 0;
+
+      function findHebrewVoice() {
+        if (!('speechSynthesis' in window)) return;
+        const voices = window.speechSynthesis.getVoices();
+        hebrewVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('he')) || null;
+      }
+
+      if ('speechSynthesis' in window) {
+        findHebrewVoice();
+        window.speechSynthesis.onvoiceschanged = findHebrewVoice;
+      }
+
+      // איפוס תור ההקראה וביטול דיבור פעיל לפני תחילת רצף חדש
+      function resetSpeechQueue() {
+        speechSequenceToken++;
+        speechQueue = [];
+        isProcessingSpeech = false;
+        if (currentSpeechTimer) {
+          clearTimeout(currentSpeechTimer);
+          currentSpeechTimer = null;
+        }
+        if ('speechSynthesis' in window) {
+          try { window.speechSynthesis.cancel(); } catch (e) {}
+        }
+      }
+
+      // הוספת משימת הקראה לתור (כל הקראה מתחילה רק אחרי שהקודמת הסתיימה)
+      function enqueueSpeech(options) {
+        speechQueue.push(Object.assign({
+          text: null,
+          forceSpeak: false,
+          delayBefore: 0,
+          delayAfter: 0,
+          onStart: null,
+          onDone: null
+        }, options));
+        if (!isProcessingSpeech) {
+          processNextSpeechItem();
+        }
+      }
+
+      function processNextSpeechItem() {
+        if (speechQueue.length === 0) {
+          isProcessingSpeech = false;
+          return;
+        }
+
+        isProcessingSpeech = true;
+        const task = speechQueue.shift();
+        const token = speechSequenceToken;
+
+        const runTask = () => {
+          if (token !== speechSequenceToken) return;
+
+          if (task.onStart) {
+            try { task.onStart(); } catch (e) {}
+          }
+
+          const finishTask = () => {
+            if (token !== speechSequenceToken) return;
+            if (currentSpeechTimer) {
+              clearTimeout(currentSpeechTimer);
+              currentSpeechTimer = null;
+            }
+            const proceed = () => {
+              if (token !== speechSequenceToken) return;
+              if (task.onDone) {
+                try { task.onDone(); } catch (e) {}
+              }
+              processNextSpeechItem();
+            };
+            if (task.delayAfter > 0) {
+              currentSpeechTimer = setTimeout(proceed, task.delayAfter);
+            } else {
+              proceed();
+            }
+          };
+
+          const shouldSpeak =
+            Boolean(task.text) &&
+            !settings.muted &&
+            settings.volume > 0.01 &&
+            (task.forceSpeak || settings.tts === 'on') &&
+            ('speechSynthesis' in window);
+
+          if (!shouldSpeak) {
+            // אם ההקראה כבויה או מושתקת, שומרים על השהיה קצרה וטבעית להשלמת הופעת האלמנט
+            const silentDuration = task.text ? 420 : 0;
+            if (silentDuration > 0) {
+              currentSpeechTimer = setTimeout(finishTask, silentDuration);
+            } else {
+              finishTask();
+            }
+            return;
+          }
+
+          try {
+            const utterance = new SpeechSynthesisUtterance(task.text);
+            utterance.lang = 'he-IL';
+            if (hebrewVoice) {
+              utterance.voice = hebrewVoice;
+            }
+            utterance.rate = 0.8;
+            utterance.pitch = 1.05;
+            utterance.volume = Math.min(1, settings.volume * 1.15);
+
+            let settled = false;
+            const settleOnce = () => {
+              if (settled) return;
+              settled = true;
+              finishTask();
+            };
+
+            utterance.onend = settleOnce;
+            utterance.onerror = settleOnce;
+
+            // רשת ביטחון: אם אירוע onend לא מתקבל תוך 3 שניות (במכשירי iOS), ממשיכים לשלב הבא
+            currentSpeechTimer = setTimeout(settleOnce, 3000);
+
+            window.speechSynthesis.speak(utterance);
+          } catch (e) {
+            finishTask();
+          }
+        };
+
+        if (task.delayBefore > 0) {
+          currentSpeechTimer = setTimeout(runTask, task.delayBefore);
+        } else {
+          runTask();
+        }
+      }
+
+      /* =====================================================================
+         4. מסלולי הספרות 0-9 (viewBox 100x140) וחישוב מיקומים מדויק על קו האמצע
+         ===================================================================== */
+      const DIGIT_CENTER_PATHS = {
+        0: [
+          'M 50 22 C 74 22, 80 46, 80 70 C 80 94, 74 118, 50 118 C 26 118, 20 94, 20 70 C 20 46, 26 22, 50 22'
+        ],
+        1: [
+          'M 34 38 L 52 22 L 52 118'
+        ],
+        2: [
+          'M 25 44 C 25 22, 75 20, 75 45 C 75 62, 55 78, 24 116 L 78 116'
+        ],
+        3: [
+          'M 26 30 C 44 20, 74 22, 74 44 C 74 60, 58 68, 44 68 C 62 68, 78 78, 78 96 C 78 118, 44 122, 24 110'
+        ],
+        4: [
+          'M 64 118 L 64 22 L 22 84 L 80 84'
+        ],
+        5: [
+          'M 74 24 L 30 24 L 27 64 C 42 56, 76 58, 76 88 C 76 114, 46 122, 24 110'
+        ],
+        6: [
+          'M 68 24 C 38 28, 22 58, 22 90 C 22 112, 38 118, 52 118 C 70 118, 78 104, 78 90 C 78 74, 64 64, 48 64 C 34 64, 24 72, 22 86'
+        ],
+        7: [
+          'M 22 24 L 78 24 L 38 118'
+        ],
+        8: [
+          'M 50 68 C 30 64, 24 52, 24 42 C 24 28, 36 22, 50 22 C 64 22, 76 28, 76 42 C 76 52, 70 64, 50 68 C 28 72, 20 84, 20 96 C 20 112, 34 118, 50 118 C 66 118, 80 112, 80 96 C 80 84, 72 72, 50 68'
+        ],
+        9: [
+          'M 78 54 C 76 68, 66 76, 52 76 C 36 76, 22 66, 22 50 C 22 36, 30 22, 48 22 C 62 22, 78 28, 78 50 C 78 82, 62 112, 32 116'
+        ]
+      };
+
+      const SVG_NS = 'http://www.w3.org/2000/svg';
+      const BASE_INNER_STROKE = 24 * 1.25; // הגדלת עובי הקו הבהיר ב-25% בכל הספרות (30)
+      const BASE_OUTER_STROKE = BASE_INNER_STROKE + 8;
+
+      function getInnerStrokeWidthForDigit(digitValue) {
+        // בספרה 4 מחזירים לעובי הקודם (24) כדי שהאלכסון, הקו האופקי והקו האנכי ייראו ברורים ללא הגדלה נוספת
+        if (digitValue === 4) {
+          return 24;
+        }
+        // בספרות 8, 9 ו-10 הגדלת עובי הקו הבהיר ב-15% נוספים
+        if (digitValue === 8 || digitValue === 9 || digitValue === 10) {
+          return BASE_INNER_STROKE * 1.15;
+        }
+        return BASE_INNER_STROKE;
+      }
+
+      function createMeasurePath(dAttr) {
+        const p = document.createElementNS(SVG_NS, 'path');
+        p.setAttribute('d', dAttr);
+        return p;
+      }
+
+      // חישוב מיקומי האלמנטים וקוטר מיטבי על קו האמצע (עם התאמה ייעודית לספרה 4)
+      function computeCenterlineLayout(digitValue) {
+        const N = digitValue;
+        const innerStrokeWidth = getInnerStrokeWidthForDigit(digitValue);
+        const outerStrokeWidth = innerStrokeWidth + 8;
+        const segments = [];
+
+        if (digitValue === 10) {
+          // בספרה 10 הצגת שתי הספרות ("1" ו-"0") בגודל מרבי ומרווח קטן ביניהן
+          const scale = 0.68;
+          const offsetY = 22.4;
+          const p1 = createMeasurePath(DIGIT_CENTER_PATHS[1][0]);
+          const p0 = createMeasurePath(DIGIT_CENTER_PATHS[0][0]);
+          segments.push({
+            pathEl: p1,
+            len: p1.getTotalLength() * scale,
+            rawLen: p1.getTotalLength(),
+            scale,
+            offsetX: -12,
+            offsetY
+          });
+          segments.push({
+            pathEl: p0,
+            len: p0.getTotalLength() * scale,
+            rawLen: p0.getTotalLength(),
+            scale,
+            offsetX: 43,
+            offsetY
+          });
+        } else {
+          const p = createMeasurePath(DIGIT_CENTER_PATHS[digitValue][0]);
+          const rawLen = p.getTotalLength();
+          segments.push({
+            pathEl: p,
+            len: rawLen,
+            rawLen: rawLen,
+            scale: 1,
+            offsetX: 0,
+            offsetY: 0
+          });
+        }
+
+        const totalLen = segments.reduce((acc, s) => acc + s.len, 0);
+        const segScale = segments[0].scale;
+        const scaledInnerStroke = innerStrokeWidth * segScale;
+        const isDigitFour = (digitValue === 4);
+
+        let countsPerSegment = [];
+        if (segments.length === 1) {
+          countsPerSegment = [N];
+        } else {
+          const exact0 = (segments[0].len / totalLen) * N;
+          let c0 = Math.max(1, Math.min(N - 1, Math.round(exact0)));
+          let c1 = N - c0;
+          countsPerSegment = [c0, c1];
+        }
+
+        function samplePointsWithDiameter(diameter) {
+          const pts = [];
+          const halfPad = isDigitFour ? diameter * 0.65 : diameter * 0.52;
+
+          segments.forEach((seg, sIdx) => {
+            const k = countsPerSegment[sIdx];
+            if (k <= 0) return;
+
+            const usableStart = Math.min(halfPad, seg.len * 0.25);
+            const usableEnd = Math.max(seg.len - halfPad, seg.len * 0.75);
+            const span = Math.max(0, usableEnd - usableStart);
+
+            for (let i = 0; i < k; i++) {
+              const frac = k === 1 ? 0.5 : (i / (k - 1));
+              const distScaled = usableStart + frac * span;
+              const rawDist = distScaled / seg.scale;
+              const rawPt = seg.pathEl.getPointAtLength(Math.max(0, Math.min(seg.rawLen, rawDist)));
+              pts.push({
+                x: rawPt.x * seg.scale + seg.offsetX,
+                y: rawPt.y * seg.scale + seg.offsetY
+              });
+            }
+          });
+          return pts;
+        }
+
+        function satisfiesAllConditions(diameter) {
+          // (א) d לא עולה על 90% מעובי הקו הבהיר (ובספרה 4 עד 84% למניעת חריגה בצמתים)
+          const maxStrokeRatio = isDigitFour ? 0.84 : 0.9;
+          if (diameter > maxStrokeRatio * scaledInnerStroke) return false;
+
+          const pts = samplePointsWithDiameter(diameter);
+          if (pts.length !== N) return false;
+
+          // (ב) ו-(ג) מרווח של לפחות 1.05 * d בין כל זוג מיקומים (ובספרה 4 לפחות 1.25 * d סביב חציית הקווים)
+          if (N > 1) {
+            const spacingFactor = isDigitFour ? 1.25 : 1.05;
+            const minDist = spacingFactor * diameter;
+            for (let i = 0; i < pts.length; i++) {
+              for (let j = i + 1; j < pts.length; j++) {
+                const dist = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+                if (dist < minDist) {
+                  return false;
+                }
+              }
+            }
+          }
+
+          // בדיקה שכל אלמנט נכנס בתוך רוחב הקו הבהיר
+          const maxRadiusInsideStroke = scaledInnerStroke * 0.5;
+          if (diameter / 2 > maxRadiusInsideStroke) return false;
+
+          return true;
+        }
+
+        // חיפוש בינארי למציאת הקוטר d הגדול ביותר שמקיים את התנאים יחד
+        const minFloorDiameter = Math.max(4, totalLen / (N * 8));
+        const maxCeilingDiameter = isDigitFour
+          ? Math.min(0.84 * scaledInnerStroke, (totalLen / Math.max(1, N)) * 0.95)
+          : Math.min(0.9 * scaledInnerStroke, (totalLen / Math.max(1, N)) * 1.4);
+
+        let low = minFloorDiameter;
+        let high = Math.max(low + 0.5, maxCeilingDiameter);
+        let bestD = low;
+
+        for (let iter = 0; iter < 32; iter++) {
+          const mid = (low + high) / 2;
+          if (satisfiesAllConditions(mid)) {
+            bestD = mid;
+            low = mid;
+          } else {
+            high = mid;
+          }
+        }
+
+        if (!satisfiesAllConditions(bestD)) {
+          bestD = isDigitFour
+            ? Math.min(0.84 * scaledInnerStroke, totalLen / Math.max(1, N * 1.45))
+            : Math.min(0.9 * scaledInnerStroke, totalLen / Math.max(1, N * 1.25));
+        }
+
+        const points = samplePointsWithDiameter(bestD);
+
+        return {
+          segments,
+          points,
+          diameter: bestD,
+          radius: bestD / 2,
+          innerStrokeWidth,
+          outerStrokeWidth,
+          segScale
+        };
+      }
+
+      const DIGIT_LAYOUTS = {};
+      function initAndVerifyAllDigits() {
+        for (let num = 1; num <= 10; num++) {
+          const layout = computeCenterlineLayout(num);
+          const maxAllowedRadius = (layout.innerStrokeWidth * layout.segScale) * 0.45;
+          const valid =
+            Array.isArray(layout.points) &&
+            layout.points.length === num &&
+            layout.radius > 0 &&
+            layout.radius <= maxAllowedRadius;
+          if (!valid) {
+            layout.radius = maxAllowedRadius;
+            layout.diameter = layout.radius * 2;
+          }
+          DIGIT_LAYOUTS[num] = layout;
+        }
+      }
+
+      initAndVerifyAllDigits();
+
+      /* =====================================================================
+         5. ציור האלמנטים החנוכתיים בקוד (SVG שטוח, רך, צבעים חמים)
+         ===================================================================== */
+      const ITEM_TYPES = ['coin', 'candle', 'dreidel', 'latke', 'sufganiya'];
+
+      function createHanukkahItemSVG(type, cx, cy, radiusSvg) {
+        const g = document.createElementNS(SVG_NS, 'g');
+        g.setAttribute('transform', `translate(${cx.toFixed(2)}, ${cy.toFixed(2)})`);
+
+        const waveG = document.createElementNS(SVG_NS, 'g');
+        waveG.classList.add('item-wave-target');
+
+        const animG = document.createElementNS(SVG_NS, 'g');
+        animG.style.opacity = '0';
+        animG.style.transform = 'scale(0.6)';
+        animG.style.transition = 'opacity 0.4s ease-out, transform 0.4s ease-out';
+
+        const r = radiusSvg * 0.94;
+        const size = r * 2;
+
+        if (type === 'coin') {
+          const circle = document.createElementNS(SVG_NS, 'circle');
+          circle.setAttribute('r', r);
+          circle.setAttribute('fill', '#f4cf65');
+          circle.setAttribute('stroke', '#b88b28');
+          circle.setAttribute('stroke-width', Math.max(0.5, size * 0.05));
+          animG.appendChild(circle);
+
+          const innerRing = document.createElementNS(SVG_NS, 'circle');
+          innerRing.setAttribute('r', r * 0.76);
+          innerRing.setAttribute('fill', 'none');
+          innerRing.setAttribute('stroke', '#d4a638');
+          innerRing.setAttribute('stroke-width', Math.max(0.35, size * 0.03));
+          animG.appendChild(innerRing);
+
+          const sr = r * 0.46;
+          const star = document.createElementNS(SVG_NS, 'polygon');
+          const pts = [];
+          for (let i = 0; i < 6; i++) {
+            const ang = (i * Math.PI) / 3 - Math.PI / 2;
+            pts.push(`${(Math.cos(ang) * sr).toFixed(2)},${(Math.sin(ang) * sr).toFixed(2)}`);
+          }
+          star.setAttribute('points', `${pts[0]} ${pts[2]} ${pts[4]}`);
+          star.setAttribute('fill', 'none');
+          star.setAttribute('stroke', '#b88b28');
+          star.setAttribute('stroke-width', Math.max(0.4, size * 0.04));
+          star.setAttribute('stroke-linejoin', 'round');
+          animG.appendChild(star);
+
+          const star2 = document.createElementNS(SVG_NS, 'polygon');
+          star2.setAttribute('points', `${pts[1]} ${pts[3]} ${pts[5]}`);
+          star2.setAttribute('fill', 'none');
+          star2.setAttribute('stroke', '#b88b28');
+          star2.setAttribute('stroke-width', Math.max(0.4, size * 0.04));
+          star2.setAttribute('stroke-linejoin', 'round');
+          animG.appendChild(star2);
+
+        } else if (type === 'candle') {
+          const bodyW = r * 0.92;
+          const bodyH = r * 1.1;
+          const bodyY = -r * 0.14;
+
+          const body = document.createElementNS(SVG_NS, 'rect');
+          body.setAttribute('x', -bodyW / 2);
+          body.setAttribute('y', bodyY);
+          body.setAttribute('width', bodyW);
+          body.setAttribute('height', bodyH);
+          body.setAttribute('rx', bodyW * 0.18);
+          body.setAttribute('fill', '#9ad1ea');
+          body.setAttribute('stroke', '#4d829c');
+          body.setAttribute('stroke-width', Math.max(0.45, size * 0.045));
+          animG.appendChild(body);
+
+          const stripe = document.createElementNS(SVG_NS, 'path');
+          stripe.setAttribute('d', `M ${-bodyW * 0.42} ${bodyY + bodyH * 0.35} L ${bodyW * 0.42} ${bodyY + bodyH * 0.65}`);
+          stripe.setAttribute('stroke', '#ffffff');
+          stripe.setAttribute('stroke-width', Math.max(0.5, size * 0.06));
+          stripe.setAttribute('stroke-linecap', 'round');
+          animG.appendChild(stripe);
+
+          const wick = document.createElementNS(SVG_NS, 'line');
+          wick.setAttribute('x1', 0);
+          wick.setAttribute('y1', bodyY);
+          wick.setAttribute('x2', 0);
+          wick.setAttribute('y2', bodyY - r * 0.16);
+          wick.setAttribute('stroke', '#5c4b3b');
+          wick.setAttribute('stroke-width', Math.max(0.4, size * 0.035));
+          animG.appendChild(wick);
+
+          const flame = document.createElementNS(SVG_NS, 'path');
+          const fy = bodyY - r * 0.16;
+          const fh = r * 0.56;
+          const fw = r * 0.32;
+          flame.setAttribute('d', `M 0 ${fy - fh} C ${fw} ${fy - fh * 0.35}, ${fw} ${fy}, 0 ${fy} C ${-fw} ${fy}, ${-fw} ${fy - fh * 0.35}, 0 ${fy - fh} Z`);
+          flame.setAttribute('fill', '#f7b955');
+          flame.setAttribute('stroke', '#d18824');
+          flame.setAttribute('stroke-width', Math.max(0.35, size * 0.035));
+          animG.appendChild(flame);
+
+        } else if (type === 'dreidel') {
+          const w = r * 1.1;
+          const h = r * 0.92;
+          const topY = -r * 0.42;
+
+          const handle = document.createElementNS(SVG_NS, 'rect');
+          handle.setAttribute('x', -w * 0.16);
+          handle.setAttribute('y', topY - r * 0.42);
+          handle.setAttribute('width', w * 0.32);
+          handle.setAttribute('height', r * 0.44);
+          handle.setAttribute('rx', w * 0.08);
+          handle.setAttribute('fill', '#628bb5');
+          handle.setAttribute('stroke', '#365678');
+          handle.setAttribute('stroke-width', Math.max(0.45, size * 0.045));
+          animG.appendChild(handle);
+
+          const body = document.createElementNS(SVG_NS, 'rect');
+          body.setAttribute('x', -w / 2);
+          body.setAttribute('y', topY);
+          body.setAttribute('width', w);
+          body.setAttribute('height', h);
+          body.setAttribute('rx', w * 0.14);
+          body.setAttribute('fill', '#7aa6d2');
+          body.setAttribute('stroke', '#365678');
+          body.setAttribute('stroke-width', Math.max(0.45, size * 0.045));
+          animG.appendChild(body);
+
+          const tip = document.createElementNS(SVG_NS, 'path');
+          tip.setAttribute('d', `M ${-w * 0.38} ${topY + h} L 0 ${topY + h + r * 0.42} L ${w * 0.38} ${topY + h} Z`);
+          tip.setAttribute('fill', '#628bb5');
+          tip.setAttribute('stroke', '#365678');
+          tip.setAttribute('stroke-width', Math.max(0.45, size * 0.045));
+          tip.setAttribute('stroke-linejoin', 'round');
+          animG.appendChild(tip);
+
+        } else if (type === 'latke') {
+          const ellipse = document.createElementNS(SVG_NS, 'ellipse');
+          ellipse.setAttribute('rx', r);
+          ellipse.setAttribute('ry', r * 0.84);
+          ellipse.setAttribute('fill', '#d99e4e');
+          ellipse.setAttribute('stroke', '#8f5d22');
+          ellipse.setAttribute('stroke-width', Math.max(0.45, size * 0.045));
+          animG.appendChild(ellipse);
+
+          const spots = [
+            { x: -r * 0.36, y: -r * 0.2, rx: r * 0.18, ry: r * 0.12 },
+            { x: r * 0.28, y: -r * 0.25, rx: r * 0.15, ry: r * 0.11 },
+            { x: -r * 0.1, y: r * 0.25, rx: r * 0.22, ry: r * 0.13 },
+            { x: r * 0.36, y: r * 0.18, rx: r * 0.14, ry: r * 0.1 }
+          ];
+          spots.forEach(s => {
+            const sp = document.createElementNS(SVG_NS, 'ellipse');
+            sp.setAttribute('cx', s.x);
+            sp.setAttribute('cy', s.y);
+            sp.setAttribute('rx', s.rx);
+            sp.setAttribute('ry', s.ry);
+            sp.setAttribute('fill', '#b0762c');
+            animG.appendChild(sp);
+          });
+
+        } else if (type === 'sufganiya') {
+          const bun = document.createElementNS(SVG_NS, 'ellipse');
+          bun.setAttribute('rx', r);
+          bun.setAttribute('ry', r * 0.86);
+          bun.setAttribute('fill', '#d69754');
+          bun.setAttribute('stroke', '#8c5826');
+          bun.setAttribute('stroke-width', Math.max(0.45, size * 0.045));
+          animG.appendChild(bun);
+
+          const sugar = document.createElementNS(SVG_NS, 'ellipse');
+          sugar.setAttribute('cy', -r * 0.12);
+          sugar.setAttribute('rx', r * 0.76);
+          sugar.setAttribute('ry', r * 0.55);
+          sugar.setAttribute('fill', '#f9f6f0');
+          animG.appendChild(sugar);
+
+          const jam = document.createElementNS(SVG_NS, 'circle');
+          jam.setAttribute('cy', -r * 0.12);
+          jam.setAttribute('r', r * 0.25);
+          jam.setAttribute('fill', '#cf4e4e');
+          jam.setAttribute('stroke', '#a33636');
+          jam.setAttribute('stroke-width', Math.max(0.35, size * 0.03));
+          animG.appendChild(jam);
+        }
+
+        waveG.appendChild(animG);
+        g.appendChild(waveG);
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            animG.style.opacity = '1';
+            animG.style.transform = 'scale(1)';
+          });
+        });
+
+        return g;
+      }
+
+      /* =====================================================================
+         6. ניהול מצב המשחק, רצף ספרות, נעילת נגיעות ותור הקראה מסונכרן
+         ===================================================================== */
+      let currentScreen = 'start'; // 'start' | 'game' | 'end'
+      let digitSequence = [];
+      let currentSeqIndex = 0;
+      let screenCounter = 0;
+      let currentDigit = 1;
+      let currentItemType = 'coin';
+      let plannedLayout = DIGIT_LAYOUTS[1];
+      let placedCount = 0;
+      let isFillingAuto = false;
+      let isDigitCompleted = false;
+      let isTouchLocked = false;
+      let isPaused = false;
+      let activeTimers = [];
+      let idleTimer = null;
+      let digitStarsAnimId = null;
+      let celebrationAnimId = null;
+
+      function clearGameTimers() {
+        activeTimers.forEach(t => clearTimeout(t));
+        activeTimers = [];
+        if (idleTimer) {
+          clearTimeout(idleTimer);
+          idleTimer = null;
+        }
+        isTouchLocked = false;
+        stopDigitStars();
+      }
+
+      function buildSequenceForLevel() {
+        let min = 1, max = 3;
+        if (settings.level === '3-5') { min = 3; max = 5; }
+        else if (settings.level === '5-10') { min = 5; max = 10; }
+        else if (settings.level === '1-10') { min = 1; max = 10; }
+
+        const arr = [];
+        for (let i = min; i <= max; i++) arr.push(i);
+
+        if (settings.order === 'rand') {
+          for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+          }
+        }
+        return arr;
+      }
+
+      function switchScreen(target) {
+        currentScreen = target;
+        document.getElementById('start-screen').classList.toggle('active', target === 'start');
+        document.getElementById('game-screen').classList.toggle('active', target === 'game');
+        document.getElementById('end-screen').classList.toggle('active', target === 'end');
+
+        document.getElementById('home-hold-wrapper').classList.toggle('visible', target === 'game');
+
+        if (target !== 'game') {
+          stopDigitStars();
+        }
+        if (target !== 'end' && celebrationAnimId) {
+          cancelAnimationFrame(celebrationAnimId);
+          celebrationAnimId = null;
+        }
+      }
+
+      // תזכורת עדינה אם אין נגיעה כ-10 שניות
+      function resetIdleTimer() {
+        if (idleTimer) clearTimeout(idleTimer);
+        const glowGroup = document.getElementById('digit-glow-group');
+        glowGroup.classList.remove('sway-hint');
+
+        if (currentScreen !== 'game' || isPaused || isFillingAuto || isDigitCompleted || isTouchLocked) return;
+
+        idleTimer = setTimeout(() => {
+          if (currentScreen === 'game' && !isPaused && !isFillingAuto && !isDigitCompleted && !isTouchLocked) {
+            glowGroup.classList.remove('sway-hint');
+            void glowGroup.offsetWidth;
+            glowGroup.classList.add('sway-hint');
+            resetIdleTimer();
+          }
+        }, 10000);
+      }
+
+      function renderDigitPaths(layout) {
+        const outlineLayer = document.getElementById('digit-outline-layer');
+        const innerLayer = document.getElementById('digit-inner-layer');
+        outlineLayer.innerHTML = '';
+        innerLayer.innerHTML = '';
+
+        layout.segments.forEach(seg => {
+          const dAttr = seg.pathEl.getAttribute('d');
+          const transformStr = `translate(${seg.offsetX}, ${seg.offsetY}) scale(${seg.scale})`;
+
+          const outerPath = document.createElementNS(SVG_NS, 'path');
+          outerPath.setAttribute('d', dAttr);
+          outerPath.setAttribute('transform', transformStr);
+          outerPath.setAttribute('fill', 'none');
+          outerPath.setAttribute('stroke', '#365370');
+          outerPath.setAttribute('stroke-width', layout.outerStrokeWidth);
+          outerPath.setAttribute('stroke-linecap', 'round');
+          outerPath.setAttribute('stroke-linejoin', 'round');
+          outlineLayer.appendChild(outerPath);
+
+          const innerPath = document.createElementNS(SVG_NS, 'path');
+          innerPath.setAttribute('d', dAttr);
+          innerPath.setAttribute('transform', transformStr);
+          innerPath.setAttribute('fill', 'none');
+          innerPath.setAttribute('stroke', '#f3f8fc');
+          innerPath.setAttribute('stroke-width', layout.innerStrokeWidth);
+          innerPath.setAttribute('stroke-linecap', 'round');
+          innerPath.setAttribute('stroke-linejoin', 'round');
+          innerLayer.appendChild(innerPath);
+        });
+      }
+
+      function setupDigitScreen(digit) {
+        clearGameTimers();
+        resetSpeechQueue();
+
+        currentDigit = digit;
+        currentItemType = ITEM_TYPES[screenCounter % ITEM_TYPES.length];
+        screenCounter++;
+
+        placedCount = 0;
+        isFillingAuto = false;
+        isDigitCompleted = false;
+        isTouchLocked = false;
+
+        const stage = document.getElementById('digit-stage');
+        const itemsLayer = document.getElementById('items-layer');
+        const glowGroup = document.getElementById('digit-glow-group');
+        const nextBtn = document.getElementById('manual-next-btn');
+
+        glowGroup.classList.remove('completed-glow', 'sway-hint');
+        nextBtn.classList.remove('visible');
+        itemsLayer.innerHTML = '';
+
+        plannedLayout = DIGIT_LAYOUTS[digit];
+        renderDigitPaths(plannedLayout);
+
+        stage.classList.remove('fading');
+        resetIdleTimer();
+      }
+
+      // הצגת אלמנט בודד והשמעת התו שלו (ההקראה מתבצעת דרך תור ההקראה המסונכרן)
+      function renderSingleItemVisualAndTone(index) {
+        if (index >= currentDigit || index >= plannedLayout.points.length) return;
+        const pt = plannedLayout.points[index];
+        const itemsLayer = document.getElementById('items-layer');
+
+        const itemEl = createHanukkahItemSVG(currentItemType, pt.x, pt.y, plannedLayout.radius);
+        itemsLayer.appendChild(itemEl);
+
+        playInstrumentNote(currentItemType, index, false);
+      }
+
+      /* =====================================================================
+         כוכבי זהב נופלים לאט סביב הספרה (חיזוק חיובי בסיום כל ספרה)
+         ===================================================================== */
+      function drawSoftStarOnCanvas(ctx, cx, cy, outerR, rot, alpha) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rot);
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        const spikes = 5;
+        const innerR = outerR * 0.48;
+        for (let i = 0; i < spikes * 2; i++) {
+          const r = i % 2 === 0 ? outerR : innerR;
+          const ang = (i * Math.PI) / spikes - Math.PI / 2;
+          const x = Math.cos(ang) * r;
+          const y = Math.sin(ang) * r;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = '#f2cb63';
+        ctx.fill();
+        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = '#c99b32';
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function startDigitCelebrationStars(durationMs = 3000) {
+        stopDigitStars();
+        const canvas = document.getElementById('digit-stars-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const stars = [];
+        const count = 20;
+        for (let i = 0; i < count; i++) {
+          stars.push({
+            x: Math.random() * canvas.width,
+            y: -Math.random() * (canvas.height * 0.5) - 20,
+            size: 10 + Math.random() * 11,
+            speedY: 0.65 + Math.random() * 0.75,
+            driftX: (Math.random() - 0.5) * 0.35,
+            rot: Math.random() * Math.PI * 2,
+            rotSpeed: (Math.random() - 0.5) * 0.012,
+            baseAlpha: 0.6 + Math.random() * 0.3
+          });
+        }
+
+        const startTime = performance.now();
+
+        function stepStars(now) {
+          const elapsed = now - startTime;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          const fadeOutFactor = elapsed > durationMs - 700
+            ? Math.max(0, (durationMs - elapsed) / 700)
+            : 1;
+
+          if (!isPaused) {
+            stars.forEach(s => {
+              s.y += s.speedY;
+              s.x += s.driftX;
+              s.rot += s.rotSpeed;
+              if (s.y > canvas.height + 24 && elapsed < durationMs - 800) {
+                s.y = -20;
+                s.x = Math.random() * canvas.width;
+              }
+              drawSoftStarOnCanvas(ctx, s.x, s.y, s.size, s.rot, s.baseAlpha * fadeOutFactor);
+            });
+          } else {
+            stars.forEach(s => drawSoftStarOnCanvas(ctx, s.x, s.y, s.size, s.rot, s.baseAlpha * fadeOutFactor));
+          }
+
+          if (elapsed < durationMs) {
+            digitStarsAnimId = requestAnimationFrame(stepStars);
+          } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            digitStarsAnimId = null;
+          }
+        }
+
+        digitStarsAnimId = requestAnimationFrame(stepStars);
+      }
+
+      function stopDigitStars() {
+        if (digitStarsAnimId) {
+          cancelAnimationFrame(digitStarsAnimId);
+          digitStarsAnimId = null;
+        }
+        const canvas = document.getElementById('digit-stars-canvas');
+        if (canvas) {
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+
+      /* =====================================================================
+         הפעלת האפקט החזותי של סיום הספרה יחד עם הקראת המשפט המסכם
+         ===================================================================== */
+      function triggerDigitCompletionEffects() {
+        const glowGroup = document.getElementById('digit-glow-group');
+        const itemsLayer = document.getElementById('items-layer');
+
+        playThreeNoteFlourish();
+
+        glowGroup.classList.add('completed-glow');
+        const tGlowOff = setTimeout(() => {
+          glowGroup.classList.remove('completed-glow');
+        }, 1300);
+        activeTimers.push(tGlowOff);
+
+        const waveTargets = itemsLayer.querySelectorAll('.item-wave-target');
+        waveTargets.forEach((el, idx) => {
+          const tWave = setTimeout(() => {
+            if (currentScreen === 'game' && !isPaused) {
+              el.classList.remove('item-wave-bounce');
+              void el.offsetWidth;
+              el.classList.add('item-wave-bounce');
+            }
+          }, idx * 180);
+          activeTimers.push(tWave);
+        });
+
+        startDigitCelebrationStars(2600);
+      }
+
+      // הוספת שלב הסיכום לתור ההקראה: 0.5 שנ' השהיה אחרי הספירה האחרונה -> משפט מסכם + אפקט חזותי -> 1 שנ' המתנה -> מעבר לספרה הבאה
+      function enqueueDigitCompletionSummary() {
+        isFillingAuto = false;
+        isDigitCompleted = true;
+        isTouchLocked = true;
+        if (idleTimer) clearTimeout(idleTimer);
+
+        const summaryPhrase = buildItemSummaryPhrase(currentDigit, currentItemType);
+
+        enqueueSpeech({
+          text: summaryPhrase,
+          forceSpeak: false,
+          delayBefore: 500, // כ-0.5 שנייה אחרי שהקראת הספירה האחרונה הסתיימה לגמרי
+          delayAfter: 1000, // כשנייה אחת אחרי שהמשפט המסכם הסתיים
+          onStart: () => {
+            if (currentScreen === 'game' && !isPaused) {
+              triggerDigitCompletionEffects();
+            }
+          },
+          onDone: () => {
+            if (currentScreen !== 'game' || isPaused) return;
+            if (settings.autoNext === 'on') {
+              advanceToNextDigit();
+            } else {
+              document.getElementById('manual-next-btn').classList.add('visible');
+            }
+          }
+        });
+      }
+
+      function advanceToNextDigit() {
+        const stage = document.getElementById('digit-stage');
+        document.getElementById('manual-next-btn').classList.remove('visible');
+        stage.classList.add('fading');
+
+        const t = setTimeout(() => {
+          if (currentScreen !== 'game') return;
+          currentSeqIndex++;
+          if (currentSeqIndex < digitSequence.length) {
+            setupDigitScreen(digitSequence[currentSeqIndex]);
+          } else {
+            startEndCelebration();
+          }
+        }, 600);
+        activeTimers.push(t);
+      }
+
+      // טיפול בנגיעה בספרה או בסביבתה הקרובה
+      function handleDigitInteraction() {
+        if (currentScreen !== 'game' || isPaused) return;
+        if (isFillingAuto || isDigitCompleted || isTouchLocked) return;
+
+        initAudio();
+        resetIdleTimer();
+
+        if (settings.fillMode === 'auto') {
+          // מצב "נגיעה אחת ממלאת הכול":
+          // האלמנטים מופיעים בזה אחר זה, והאלמנט הבא מופיע רק אחרי שהקראת הספירה של הקודם הסתיימה ועוד כ-0.3 שנייה
+          isFillingAuto = true;
+          isTouchLocked = true;
+          if (idleTimer) clearTimeout(idleTimer);
+
+          resetSpeechQueue();
+
+          const startIdx = placedCount;
+          for (let i = startIdx; i < currentDigit; i++) {
+            const countNum = i + 1;
+            const isLast = (countNum === currentDigit);
+
+            enqueueSpeech({
+              text: HEBREW_COUNT_FEM[countNum],
+              forceSpeak: false,
+              delayBefore: i === startIdx ? 0 : 300, // 0.3 שנייה אחרי סיום הקראת הספירה הקודמת
+              delayAfter: 0,
+              onStart: () => {
+                if (currentScreen !== 'game' || isPaused) return;
+                renderSingleItemVisualAndTone(i);
+                placedCount = countNum;
+              },
+              onDone: () => {
+                if (currentScreen !== 'game' || isPaused) return;
+                if (isLast) {
+                  enqueueDigitCompletionSummary();
+                }
+              }
+            });
+          }
+        } else {
+          // מצב ברירת מחדל: כל נגיעה מוסיפה אלמנט אחד בלבד
+          if (placedCount < currentDigit) {
+            isTouchLocked = true;
+            if (idleTimer) clearTimeout(idleTimer);
+
+            resetSpeechQueue();
+
+            const itemIdx = placedCount;
+            const countNum = itemIdx + 1;
+            const isLast = (countNum === currentDigit);
+
+            enqueueSpeech({
+              text: HEBREW_COUNT_FEM[countNum],
+              forceSpeak: false,
+              delayBefore: 0,
+              delayAfter: 0,
+              onStart: () => {
+                if (currentScreen !== 'game' || isPaused) return;
+                renderSingleItemVisualAndTone(itemIdx);
+                placedCount = countNum;
+              },
+              onDone: () => {
+                if (currentScreen !== 'game' || isPaused) return;
+                if (isLast) {
+                  enqueueDigitCompletionSummary();
+                } else {
+                  isTouchLocked = false;
+                  resetIdleTimer();
+                }
+              }
+            });
+          }
+        }
+      }
+
+      function startNewGame(selectedLevel) {
+        if (selectedLevel) {
+          settings.level = selectedLevel;
+          saveSettings();
+          syncSettingsUI();
+        }
+        initAudio();
+        clearGameTimers();
+        resetSpeechQueue();
+        digitSequence = buildSequenceForLevel();
+        currentSeqIndex = 0;
+        switchScreen('game');
+        setupDigitScreen(digitSequence[0]);
+      }
+
+      /* =====================================================================
+         7. חגיגת סיום השלב ("כל הכבוד!") ולאחריה מסך סיום רגוע עם שני כפתורים
+         ===================================================================== */
+      function startEndCelebration() {
+        clearGameTimers();
+        resetSpeechQueue();
+        switchScreen('end');
+
+        const msgEl = document.getElementById('celebration-msg');
+        const endButtonsStack = document.getElementById('end-buttons-stack');
+        msgEl.classList.remove('hidden-msg');
+        endButtonsStack.classList.remove('visible');
+
+        // "כֹּל הַכָּבוֹד!" מוקרא רק בסוף השלב
+        enqueueSpeech({
+          text: 'כֹּל הַכָּבוֹד!',
+          forceSpeak: true
+        });
+        playCelebrationMelody();
+
+        const canvas = document.getElementById('celebration-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+
+        const stars = [];
+        const starCount = 26;
+        for (let i = 0; i < starCount; i++) {
+          stars.push({
+            x: Math.random() * canvas.width,
+            y: -Math.random() * canvas.height * 0.8 - 30,
+            size: 12 + Math.random() * 14,
+            speedY: 0.7 + Math.random() * 0.9,
+            driftX: (Math.random() - 0.5) * 0.4,
+            rot: Math.random() * Math.PI * 2,
+            rotSpeed: (Math.random() - 0.5) * 0.015,
+            alpha: 0.55 + Math.random() * 0.35
+          });
+        }
+
+        const startTime = performance.now();
+        const duration = 5000;
+
+        function animateCelebration(now) {
+          const elapsed = now - startTime;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          if (!isPaused) {
+            stars.forEach(s => {
+              s.y += s.speedY;
+              s.x += s.driftX;
+              s.rot += s.rotSpeed;
+              if (s.y > canvas.height + 30 && elapsed < duration - 1200) {
+                s.y = -25;
+                s.x = Math.random() * canvas.width;
+              }
+              drawSoftStarOnCanvas(ctx, s.x, s.y, s.size, s.rot, s.alpha);
+            });
+          } else {
+            stars.forEach(s => drawSoftStarOnCanvas(ctx, s.x, s.y, s.size, s.rot, s.alpha));
+          }
+
+          if (elapsed < duration) {
+            celebrationAnimId = requestAnimationFrame(animateCelebration);
+          } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            celebrationAnimId = null;
+          }
+        }
+
+        celebrationAnimId = requestAnimationFrame(animateCelebration);
+
+        const tShowButtons = setTimeout(() => {
+          msgEl.classList.add('hidden-msg');
+          endButtonsStack.classList.add('visible');
+        }, duration);
+        activeTimers.push(tShowButtons);
+      }
+
+      /* =====================================================================
+         8. ניהול חלונית הגדרות מבוגר והשהיית משחק
+         ===================================================================== */
+      const settingsBtn = document.getElementById('settings-btn');
+      const settingsBackdrop = document.getElementById('settings-backdrop');
+      const settingsPanel = document.getElementById('settings-panel');
+      const closeSettingsBtn = document.getElementById('close-settings-btn');
+      const volumeSlider = document.getElementById('volume-slider');
+      const muteBtn = document.getElementById('mute-btn');
+
+      function syncSettingsUI() {
+        document.querySelectorAll('#opt-level .seg-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.val === settings.level);
+        });
+        document.querySelectorAll('#opt-fill .seg-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.val === settings.fillMode);
+        });
+        document.querySelectorAll('#opt-order .seg-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.val === settings.order);
+        });
+        document.querySelectorAll('#opt-autonext .seg-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.val === settings.autoNext);
+        });
+        document.querySelectorAll('#opt-tts .seg-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.val === settings.tts);
+        });
+
+        volumeSlider.value = settings.volume;
+        muteBtn.classList.toggle('muted', settings.muted);
+        muteBtn.textContent = settings.muted ? '🔇' : '🔊';
+      }
+
+      function openSettings() {
+        isPaused = true;
+        clearGameTimers();
+        stopAllSounds();
+        resetSpeechQueue();
+        syncSettingsUI();
+        settingsBackdrop.classList.add('open');
+        settingsPanel.classList.add('open');
+      }
+
+      function closeSettings() {
+        if (!settingsPanel.classList.contains('open')) return;
+        settingsBackdrop.classList.remove('open');
+        settingsPanel.classList.remove('open');
+        isPaused = false;
+
+        if (currentScreen === 'game') {
+          if (isFillingAuto) {
+            isFillingAuto = false;
+            handleDigitInteractionResume();
+          } else if (isDigitCompleted) {
+            if (settings.autoNext === 'on') {
+              advanceToNextDigit();
+            } else {
+              document.getElementById('manual-next-btn').classList.add('visible');
+            }
+          } else {
+            isTouchLocked = false;
+            resetIdleTimer();
+          }
+        }
+      }
+
+      function handleDigitInteractionResume() {
+        if (placedCount >= currentDigit) {
+          enqueueDigitCompletionSummary();
+          return;
+        }
+        isFillingAuto = true;
+        isTouchLocked = true;
+        resetSpeechQueue();
+
+        const startIdx = placedCount;
+        for (let i = startIdx; i < currentDigit; i++) {
+          const countNum = i + 1;
+          const isLast = (countNum === currentDigit);
+
+          enqueueSpeech({
+            text: HEBREW_COUNT_FEM[countNum],
+            forceSpeak: false,
+            delayBefore: i === startIdx ? 0 : 300,
+            delayAfter: 0,
+            onStart: () => {
+              if (currentScreen !== 'game' || isPaused) return;
+              renderSingleItemVisualAndTone(i);
+              placedCount = countNum;
+            },
+            onDone: () => {
+              if (currentScreen !== 'game' || isPaused) return;
+              if (isLast) {
+                enqueueDigitCompletionSummary();
+              }
+            }
+          });
+        }
+      }
+
+      settingsBtn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        openSettings();
+      });
+
+      closeSettingsBtn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        closeSettings();
+      });
+
+      settingsBackdrop.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        closeSettings();
+      });
+
+      settingsPanel.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+      });
+
+      function bindSegmentedControl(containerId, settingKey, onChangeCallback) {
+        const container = document.getElementById(containerId);
+        container.querySelectorAll('.seg-btn').forEach(btn => {
+          btn.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            settings[settingKey] = btn.dataset.val;
+            saveSettings();
+            syncSettingsUI();
+            if (onChangeCallback) onChangeCallback();
+          });
+        });
+      }
+
+      bindSegmentedControl('opt-level', 'level', () => {
+        if (currentScreen === 'game') {
+          digitSequence = buildSequenceForLevel();
+          currentSeqIndex = 0;
+          setupDigitScreen(digitSequence[0]);
+        }
+      });
+
+      bindSegmentedControl('opt-fill', 'fillMode');
+      bindSegmentedControl('opt-order', 'order', () => {
+        if (currentScreen === 'game') {
+          digitSequence = buildSequenceForLevel();
+          currentSeqIndex = 0;
+          setupDigitScreen(digitSequence[0]);
+        }
+      });
+      bindSegmentedControl('opt-autonext', 'autoNext');
+      bindSegmentedControl('opt-tts', 'tts');
+
+      volumeSlider.addEventListener('input', (e) => {
+        settings.volume = parseFloat(e.target.value);
+        if (settings.volume > 0 && settings.muted) {
+          settings.muted = false;
+        }
+        saveSettings();
+        syncSettingsUI();
+      });
+
+      muteBtn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        settings.muted = !settings.muted;
+        if (settings.muted) {
+          stopAllSounds();
+          resetSpeechQueue();
+        }
+        saveSettings();
+        syncSettingsUI();
+      });
+
+      // כפתור חזרה למסך פתיחה בלחיצה ארוכה של 2 שניות עם חיווי התקדמות עדין
+      const homeHoldBtn = document.getElementById('home-hold-btn');
+      const homeHoldFill = document.getElementById('home-hold-fill');
+      let holdStartTime = null;
+      let holdAnimFrame = null;
+
+      function cancelHomeHold() {
+        holdStartTime = null;
+        if (holdAnimFrame) {
+          cancelAnimationFrame(holdAnimFrame);
+          holdAnimFrame = null;
+        }
+        homeHoldFill.style.width = '0%';
+      }
+
+      homeHoldBtn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        holdStartTime = performance.now();
+
+        function stepHold(now) {
+          if (!holdStartTime) return;
+          const elapsed = now - holdStartTime;
+          const pct = Math.min(100, (elapsed / 2000) * 100);
+          homeHoldFill.style.width = pct + '%';
+
+          if (elapsed >= 2000) {
+            cancelHomeHold();
+            settingsBackdrop.classList.remove('open');
+            settingsPanel.classList.remove('open');
+            isPaused = false;
+            clearGameTimers();
+            stopAllSounds();
+            resetSpeechQueue();
+            switchScreen('start');
+          } else {
+            holdAnimFrame = requestAnimationFrame(stepHold);
+          }
+        }
+        holdAnimFrame = requestAnimationFrame(stepHold);
+      });
+
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(evt => {
+        homeHoldBtn.addEventListener(evt, cancelHomeHold);
+      });
+
+      /* =====================================================================
+         9. אירועי אינטראקציה ראשיים (מגע, עכבר ומקלדת)
+         ===================================================================== */
+      document.querySelectorAll('#start-screen .level-choice-btn').forEach(btn => {
+        btn.addEventListener('pointerdown', (e) => {
+          e.stopPropagation();
+          startNewGame(btn.dataset.level);
+        });
+      });
+
+      document.getElementById('play-again-btn').addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        startNewGame(settings.level);
+      });
+
+      document.getElementById('end-home-btn').addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        clearGameTimers();
+        stopAllSounds();
+        resetSpeechQueue();
+        switchScreen('start');
+      });
+
+      document.getElementById('digit-stage').addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        handleDigitInteraction();
+      });
+
+      document.getElementById('manual-next-btn').addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        advanceToNextDigit();
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (settingsPanel.classList.contains('open')) {
+            e.preventDefault();
+            closeSettings();
+          }
+          return;
+        }
+
+        if (isPaused) return;
+
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          if (currentScreen === 'start') {
+            startNewGame(settings.level);
+          } else if (currentScreen === 'game') {
+            if (isDigitCompleted && settings.autoNext === 'off') {
+              advanceToNextDigit();
+            } else {
+              handleDigitInteraction();
+            }
+          } else if (currentScreen === 'end') {
+            const endStack = document.getElementById('end-buttons-stack');
+            if (endStack.classList.contains('visible')) {
+              startNewGame(settings.level);
+            }
+          }
+        }
+      });
+
+      syncSettingsUI();
+    })();
+  </script>
+</body>
+</html>
